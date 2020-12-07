@@ -71,8 +71,8 @@ class JointModel(nn.Module):
         ent_span_pred = ent_span_outputs['predict'] #[(batch_size, seq_size)]
         #2---随机选取真实和预测的标签进行训练，由sch_k系数控制，实验的时候使用真实标签
         if self.training and batch['i_epoch'] is not None:
-            # sch_p = self.sch_k / (self.sch_k + np.exp(batch['i_epoch'] / self.sch_k))
-            sch_p = 1.0
+            sch_p = self.sch_k / (self.sch_k + np.exp(batch['i_epoch'] / self.sch_k))
+            # sch_p = 1.0
             ent_span_pred = [gold if np.random.random() < sch_p else pred
                              for pred, gold in zip(ent_span_pred, batch['ent_span_labels'])]
             ent_span_pred = torch.stack(ent_span_pred) #[(batch_size, seq_size)]
@@ -109,7 +109,6 @@ class JointModel(nn.Module):
         all_candi_rels, all_rel_labels = self.generate_all_candidates(batch)
         batch['all_candi_rels'] = all_candi_rels
         batch['all_rel_labels'] = all_rel_labels
-
 
         candi_rel_num = sum([len(e) for e in all_candi_rels])
 

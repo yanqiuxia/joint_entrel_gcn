@@ -3,7 +3,7 @@
 # @Author : yanqiuxia
 # @Version：V 0.1
 # @File : my_train.py
-#!/usr/bin/env python
+# !/usr/bin/env python
 # -*- coding:utf-8 -*-
 """
 Created on 18/09/21 15:48:17
@@ -12,19 +12,15 @@ Created on 18/09/21 15:48:17
 """
 import os
 import sys
+
 sys.path.append("..")
 import argparse
-import json
 from typing import Dict, List, Any
-from collections import defaultdict
 
 import torch
 import torch.optim as optim
 import numpy as np
-from torch.autograd import Variable
 from tensorboardX import SummaryWriter
-from allennlp.modules.span_extractors.bidirectional_endpoint_span_extractor import BidirectionalEndpointSpanExtractor
-from allennlp.modules.span_extractors.endpoint_span_extractor import EndpointSpanExtractor
 
 from run.config import Configurable
 from lib import vocabulary, util
@@ -34,14 +30,13 @@ from src.decoder import VanillaSoftmaxDecoder
 from src.word_encoder import WordCharEncoder
 from modules.span_extractors.cnn_span_extractor import CnnSpanExtractor
 from run.entrel_eval import eval_file
-from run.entrel_eval import Metrics
 from src.joint_model import JointModel
 from src.ent_span_feat_extractor import EntSpanFeatExtractor
 from src.rel_feat_extractor import RelFeatExtractor
 from src.graph_cnn_encoder import GCN
 import lib.util2 as myutil
 
-torch.manual_seed(5216) # CPU random seed
+torch.manual_seed(5216)  # CPU random seed
 np.random.seed(5216)
 
 argparser = argparse.ArgumentParser()
@@ -71,7 +66,7 @@ print("Total items in dev corpus: %s" % len(dev_corpus))
 # print("Total items in test corpus: %s" % len(test_corpus))
 print("Max sentence length: %s" % max_sent_len)
 
-namespace_counter = myutil.create_counter(train_corpus + dev_corpus ) #Dict[str, Dict[str, int]]
+namespace_counter = myutil.create_counter(train_corpus + dev_corpus)  # Dict[str, Dict[str, int]]
 namespace_counter = myutil.pad_counter(namespace_counter)
 for namespace in namespace_counter.keys():
     print(namespace, len(namespace_counter[namespace]))
@@ -139,7 +134,6 @@ rel_feat_extractor = RelFeatExtractor(
     config.dropout,
     config.use_cuda)
 
-
 ent_ids_decoder = VanillaSoftmaxDecoder(hidden_size=config.lstm_hiddens * 2,
                                         tag_size=vocab.get_vocab_size("ent_ids_labels"))
 rel_decoder = VanillaSoftmaxDecoder(hidden_size=config.lstm_hiddens * 2,
@@ -179,6 +173,7 @@ if os.path.exists(config.load_model_path):
 parameters = [p for p in mymodel.parameters() if p.requires_grad]
 optimizer = optim.Adadelta(parameters)
 
+
 def create_batch_list(sort_batch_tensor: Dict[str, Any],
                       outputs: Dict[str, Any]) -> List[Dict[str, Any]]:
     new_batch = []
@@ -200,6 +195,7 @@ def create_batch_list(sort_batch_tensor: Dict[str, Any],
         new_batch.append(instance)
     return new_batch
 
+
 def step(batch: List[Dict]) -> (List[Dict], Dict):
     sort_batch_tensor = myutil.get_minibatch(batch, vocab, config.use_cuda)
     sort_batch_tensor['i_epoch'] = i
@@ -212,20 +208,29 @@ def step(batch: List[Dict]) -> (List[Dict], Dict):
     batch_outputs['bin_rel_loss'] = outputs['bin_rel_loss']
     return new_batch, batch_outputs
 
+
 def train_step(batch: List[Dict]) -> None:
-    optimizer.zero_grad()
     mymodel.train()
     _, outputs = step(batch)
     loss = outputs['ent_span_loss'] + outputs['ent_ids_loss'] + outputs['rel_loss'] + outputs['bin_rel_loss']
+    # 2.1 loss regularization
+    loss = loss / config.accumulation_steps
+    # 2.2 back propagation
     loss.backward()
     torch.nn.utils.clip_grad_norm_(parameters, config.clip_c)
-    optimizer.step()
+
+    # 3. update parameters of net
+    if ((num_iter + 1) % config.accumulation_steps) == 0:
+        # optimizer the net
+        optimizer.step()  # update parameters of net
+        optimizer.zero_grad()  # reset gradient
+
     print("Epoch : %d Minibatch : %d Loss : %.5f(%.5f, %.5f, %.5f, %.5f)" % (
-          i, j, loss.item(),
-          outputs['ent_span_loss'].item(),
-          outputs['ent_ids_loss'].item(),
-          outputs['rel_loss'].item(),
-          outputs['bin_rel_loss'].item()))
+        i, j, loss.item(),
+        outputs['ent_span_loss'].item(),
+        outputs['ent_ids_loss'].item(),
+        outputs['rel_loss'].item(),
+        outputs['bin_rel_loss'].item()))
     writer.add_scalar("Train/Loss", loss.item(), num_iter)
     writer.add_scalar("Train/EntSpanLoss", outputs['ent_span_loss'].item(), num_iter)
     writer.add_scalar("Train/EntLoss", outputs['ent_ids_loss'].item(), num_iter)
@@ -256,11 +261,11 @@ def dev_step() -> float:
     loss = avg_ent_span_loss + avg_ent_ids_loss + avg_rel_loss + avg_bin_rel_loss
 
     print("Epoch : %d Avg Loss : %.5f(%.5f, %.5f, %.5f, %.5f)" % (
-          i, loss,
-          avg_ent_span_loss,
-          avg_ent_ids_loss,
-          avg_rel_loss,
-          avg_bin_rel_loss))
+        i, loss,
+        avg_ent_span_loss,
+        avg_ent_ids_loss,
+        avg_rel_loss,
+        avg_bin_rel_loss))
     writer.add_scalar("Dev/Loss", loss, num_iter)
     writer.add_scalar("Dev/EntSpanLoss", avg_ent_span_loss, num_iter)
     writer.add_scalar("Dev/EntLoss", avg_ent_ids_loss, num_iter)
@@ -271,9 +276,8 @@ def dev_step() -> float:
     eval_ent_span_path = os.path.join(config.save_dir, "validate.dev.output.ent_span")
     myutil.print_predictions(new_corpus, eval_path, vocab)
     myutil.print_ent_span_predictions(new_corpus, eval_ent_span_path, vocab)
-    entity, relation= eval_file(eval_path)
+    entity, relation = eval_file(eval_path)
     eval_file(eval_ent_span_path)
-
 
     writer.add_scalar("Dev/EntPrecision", entity.prec, num_iter)
     writer.add_scalar("Dev/EntRecall", entity.rec, num_iter)
@@ -284,32 +288,53 @@ def dev_step() -> float:
     return relation.fscore
 
 
-batch_size = config.batch_size
-best_f1 = 0.0
-cur_patience = 0
-num_iter = 0
-writer = SummaryWriter(os.path.join(config.save_dir, "runs"))
-for i in range(config.train_iters):
-    np.random.shuffle(train_corpus)
+ap = argparse.ArgumentParser()
 
-    for j in range(0, len(train_corpus), batch_size):
+ap.add_argument('--isTrain', default=False, help='True for continuing training')
+ap.add_argument('--isFinetune', default=False, help='True for continuing training')
+ap.add_argument('--load_model_path', default='./ckpt/test/minibatch/epoch__20_model')
 
-        batch = train_corpus[j: j + batch_size]
+args = ap.parse_args()
 
-        train_step(batch)
-        #  sys.exit()
-        num_iter += 1
 
-    print("Evaluating Model on dev set ...")
+if __name__ == '__main__':
+    batch_size = config.batch_size
+    best_f1 = 0.0
+    cur_patience = 0
+    num_iter = 0
+    writer = SummaryWriter(os.path.join(config.save_dir, "runs"))
+    if args.isFinetune:
+        state_dict = torch.load(args.load_model_path)
+        mymodel.load_state_dict(state_dict)
+        print("the model file is %s" % args.load_model_path)
+    i = None
+    if args.isTrain:
+        print('begin train')
+        for i in range(config.train_iters):
+            np.random.shuffle(train_corpus)
 
-    dev_f1 = dev_step()
-    cur_patience += 1
-    if dev_f1 > best_f1:
-        cur_patience = 0
-        best_f1 = dev_f1
-        print("Saving model ...")
-        torch.save(mymodel.state_dict(),
-                    open(os.path.join(config.save_dir, "minibatch", "epoch__%d_model" % i), "wb"))
-        torch.save(mymodel.state_dict(), open(config.save_model_path, "wb"))
-    #  if cur_patience > config.patience:
-        #  break
+            for j in range(0, len(train_corpus), batch_size):
+                batch = train_corpus[j: j + batch_size]
+
+                train_step(batch)
+                #  sys.exit()
+                num_iter += 1
+
+            print("Evaluating Model on dev set ...")
+
+            dev_f1 = dev_step()
+            cur_patience += 1
+            if dev_f1 > best_f1:
+                cur_patience = 0
+                best_f1 = dev_f1
+                print("Saving model ...")
+                torch.save(mymodel.state_dict(),
+                           open(os.path.join(config.save_dir, "minibatch", "epoch__%d_model" % i), "wb"))
+                torch.save(mymodel.state_dict(), open(config.save_model_path, "wb"))
+
+    else:
+        print('begin eval')
+        state_dict = torch.load(args.load_model_path)
+        mymodel.load_state_dict(state_dict)
+        dev_f1 = dev_step()
+        print('dev_f1: %.5f' % dev_f1)

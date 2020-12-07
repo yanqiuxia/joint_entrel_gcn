@@ -156,6 +156,10 @@ class Configurable:
     @property
     def validate_every(self):
         return self._config.getint('Run','validate_every')
+    @property
+    def accumulation_steps(self):
+        return self._config.getint('Run', 'accumulation_steps')
+
 
 if __name__ == "__main__":
     argparser = argparse.ArgumentParser()
