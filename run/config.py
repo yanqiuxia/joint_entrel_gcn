@@ -138,6 +138,10 @@ class Configurable:
         return self._config.getfloat('Network','schedule_k')
 
     @property
+    def max_entity_num(self):
+        return self._config.getint('Network', 'max_entity_num')
+
+    @property
     def clip_c(self):
         return self._config.getfloat('Optimizer','clip_c')
 

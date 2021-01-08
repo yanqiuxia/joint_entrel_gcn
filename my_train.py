@@ -157,7 +157,8 @@ mymodel = JointModel(word_encoder,
                      gcn,
                      vocab,
                      config.schedule_k,
-                     config.use_cuda)
+                     config.use_cuda,
+                     config.max_entity_num)
 
 util.assign_embeddings(word_encoder.word_embeddings, pretrained_embeddings)
 if config.use_cuda:
@@ -258,6 +259,7 @@ def dev_step() -> float:
     avg_ent_ids_loss = np.mean(ent_ids_losses)
     avg_rel_loss = np.mean(rel_losses)
     avg_bin_rel_loss = np.mean(bin_rel_losses)
+
     loss = avg_ent_span_loss + avg_ent_ids_loss + avg_rel_loss + avg_bin_rel_loss
 
     print("Epoch : %d Avg Loss : %.5f(%.5f, %.5f, %.5f, %.5f)" % (
@@ -290,9 +292,9 @@ def dev_step() -> float:
 
 ap = argparse.ArgumentParser()
 
-ap.add_argument('--isTrain', default=False, help='True for continuing training')
+ap.add_argument('--isTrain', default=True, help='True for continuing training')
 ap.add_argument('--isFinetune', default=False, help='True for continuing training')
-ap.add_argument('--load_model_path', default='./ckpt/test/minibatch/epoch__20_model')
+ap.add_argument('--load_model_path', default='./ckpt/test/minibatch/epoch__19_model')
 
 args = ap.parse_args()
 
@@ -307,7 +309,7 @@ if __name__ == '__main__':
         state_dict = torch.load(args.load_model_path)
         mymodel.load_state_dict(state_dict)
         print("the model file is %s" % args.load_model_path)
-    i = None
+    i = 0
     if args.isTrain:
         print('begin train')
         for i in range(config.train_iters):

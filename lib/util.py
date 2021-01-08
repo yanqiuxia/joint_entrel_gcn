@@ -114,3 +114,12 @@ def assign_embeddings(embedding_module: nn.Embedding,
     embedding_module.weight.data.copy_(torch.from_numpy(pretrained_embeddings))
     if fix_embedding:
         embedding_module.weight.requires_grad = False
+
+if __name__ == '__main__':
+    tag = "O"
+    guessed, guessed_type = parse_tag(tag)
+    print(guessed," ", guessed_type)
+
+    tag = "B-ENT"
+    guessed, guessed_type = parse_tag(tag)
+    print(guessed, " ", guessed_type)

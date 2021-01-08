@@ -41,7 +41,8 @@ class JointModel(nn.Module):
                  gcn: GCN,
                  vocab: Vocabulary,
                  sch_k: float,
-                 use_cuda: bool) -> None:
+                 use_cuda: bool,
+                 max_entity_num:int) -> None:
         super(JointModel, self).__init__()
         self.word_encoder = word_encoder
         self.seq2seq_encoder = seq2seq_encoder
@@ -54,7 +55,7 @@ class JointModel(nn.Module):
         self.vocab = vocab
         self.sch_k = sch_k
         self.use_cuda = use_cuda
-        self.ent_span_generator = EntSpanGenerator(vocab)
+        self.ent_span_generator = EntSpanGenerator(vocab,max_entity_num)
         self.gcn_extractor = GCNExtractor(gcn, use_cuda)
 
     def forward(self, batch: Dict[str, Any]) -> Dict:
